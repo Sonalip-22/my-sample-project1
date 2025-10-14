@@ -4,65 +4,56 @@ pipeline {
     environment {
         GIT_CREDENTIAL_ID = 'github-cred'
         DOCKERHUB_CREDENTIAL_ID = 'dockerhub-cred'
-        IMAGE_NAME = 'yourdockerhubusername/simple-maven-demo'
-    }git
-
-    triggers {
-        githubPush()
+        IMAGE_NAME = 'sonalip22/simple-maven-demo' // <-- use your real Docker Hub username
     }
 
     stages {
-        stage('Pull from GitHub') {
+        stage('Checkout Code') {
             steps {
-                git branch: 'main', credentialsId: 'github-cred', url: 'https://github.com/Sonalip-22/my-sample-project1.git'
-                echo "✅ Code pulled successfully."
+                git branch: 'main', credentialsId: "${GIT_CREDENTIAL_ID}", url: 'https://github.com/Sonalip-22/my-sample-project1.git'
             }
         }
 
         stage('Build with Maven') {
             steps {
-                sh 'mvn clean package -DskipTests'
-                echo "✅ Maven build completed."
+                sh 'mvn clean package'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${IMAGE_NAME}:latest ."
-                echo "✅ Docker image built."
+                script {
+                    sh "docker build -t ${IMAGE_NAME}:latest ."
+                }
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIAL_ID}", usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                    sh '''
-                        echo "$PASS" | docker login -u "$USER" --password-stdin
-                        docker push ${IMAGE_NAME}:latest
-                        docker logout
-                    '''
+                withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIAL_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    script {
+                        sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+                        sh "docker push ${IMAGE_NAME}:latest"
+                    }
                 }
-                echo "✅ Image pushed to DockerHub."
             }
         }
 
         stage('Run Container') {
             steps {
-                sh '''
-                    docker rm -f simple-maven-demo || true
-                    docker run -d --name simple-maven-demo -p 8080:8080 ${IMAGE_NAME}:latest
-                '''
-                echo "✅ Container running successfully."
+                script {
+                    sh "docker run -d -p 8080:8080 ${IMAGE_NAME}:latest"
+                }
             }
         }
     }
 
     post {
         success {
-            echo "🎉 Pipeline executed successfully!"
+            echo '✅ Build and deployment successful!'
         }
         failure {
-            echo "❌ Pipeline failed, check logs."
+            echo '❌ Pipeline failed. Please check the logs.'
         }
     }
 }
