@@ -5,7 +5,7 @@ pipeline {
         GIT_CREDENTIAL_ID = 'github-cred'
         DOCKERHUB_CREDENTIAL_ID = 'dockerhub-cred'
         IMAGE_NAME = 'yourdockerhubusername/simple-maven-demo'
-    }
+    }git
 
     triggers {
         githubPush()
@@ -14,7 +14,7 @@ pipeline {
     stages {
         stage('Pull from GitHub') {
             steps {
-                git branch: 'main', url: 'https://github.com/yourusername/simple-maven-pipeline.git'
+                git branch: 'main', url: 'https://github.com/Sonalip-22/my-sample-project1.git'
                 echo "✅ Code pulled successfully."
             }
         }
