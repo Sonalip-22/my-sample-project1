@@ -14,7 +14,7 @@ pipeline {
     stages {
         stage('Pull from GitHub') {
             steps {
-                git branch: 'main', url: 'https://github.com/Sonalip-22/my-sample-project1.git'
+                git branch: 'main', credentialsId: 'github-cred', url: 'https://github.com/Sonalip-22/my-sample-project1.git'
                 echo "✅ Code pulled successfully."
             }
         }
