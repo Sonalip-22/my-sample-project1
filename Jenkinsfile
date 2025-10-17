@@ -76,7 +76,7 @@ pipeline {
                         if ss -tuln | grep -q ":8080 "; then
                           echo "⚠️ Port 8080 is in use. Killing existing process..."
                           PID=$(lsof -ti :8080)
-                          sudo kill -9 $PID
+                          kill -9 $PID
                           echo "✅ Process on port 8080 killed."
                         fi
 
