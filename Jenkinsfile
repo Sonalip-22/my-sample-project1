@@ -2,14 +2,10 @@ pipeline {
     agent any
 
     environment {
-        GIT_CREDENTIAL_ID        = 'github-cred'
-        DOCKERHUB_CREDENTIAL_ID  = 'dockerhub-cred'
-        IMAGE_NAME               = 'sonalipawar22/simple-maven-demo'
-        MVN_CMD                  = 'mvn -B clean package'
+        IMAGE_NAME = "sonalipawar22/simple-maven-demo:latest"
     }
 
     stages {
-
         stage('Cleanup workspace') {
             steps {
                 echo "🧹 Cleaning workspace..."
@@ -20,7 +16,7 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 echo "📥 Checking out source code..."
-                git branch: 'main', credentialsId: "${GIT_CREDENTIAL_ID}", url: 'https://github.com/Sonalip-22/my-sample-project1.git'
+                git url: 'https://github.com/Sonalip-22/my-sample-project1.git', branch: 'main', credentialsId: 'github-cred'
             }
         }
 
@@ -28,7 +24,7 @@ pipeline {
             steps {
                 echo "⚙️ Building with Maven..."
                 timeout(time: 30, unit: 'MINUTES') {
-                    sh "${MVN_CMD}"
+                    sh 'mvn -B clean package'
                 }
             }
         }
@@ -46,7 +42,7 @@ pipeline {
                     echo "🏗️ Building Docker image..."
                     sh '''
                         export DOCKER_BUILDKIT=0
-                        docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} -t ${IMAGE_NAME}:latest .
+                        docker build -t ${IMAGE_NAME} .
                     '''
                 }
             }
@@ -55,16 +51,12 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIAL_ID}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                        sh '''#!/bin/bash
-                        set -e
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                         echo "🔑 Logging in to Docker Hub..."
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        echo "🚀 Pushing Docker images..."
-                        docker push ${IMAGE_NAME}:${BUILD_NUMBER}
-                        docker push ${IMAGE_NAME}:latest
-                        docker logout
-                        '''
+                        sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                        echo "🚀 Pushing Docker image..."
+                        sh 'docker push ${IMAGE_NAME}'
+                        sh 'docker logout'
                     }
                 }
             }
@@ -73,14 +65,36 @@ pipeline {
         stage('Run Container') {
             steps {
                 script {
-                    echo "🚀 Starting container..."
-                    sh '''
+                    sh '''#!/bin/bash
+                        set -e
+                        echo "🚀 Starting container deployment..."
+
+                        # Clean up any old container
                         docker rm -f simple-demo || true
-                        docker run -d -p 8080:8080 --name simple-demo ${IMAGE_NAME}:latest
+
+                        # Detect if port 8080 is busy
+                        if ss -tuln | grep -q ":8080 "; then
+                          echo "⚠️ Port 8080 is in use, searching for an available port..."
+                          for p in $(seq 8081 8100); do
+                            if ! ss -tuln | grep -q ":$p "; then
+                              PORT=$p
+                              echo "✅ Found free port: $PORT"
+                              break
+                            fi
+                          done
+                        else
+                          PORT=8080
+                        fi
+
+                        # Run the container on the available port
+                        echo "🚢 Running container on port $PORT..."
+                        docker run -d -p ${PORT}:8080 --name simple-demo ${IMAGE_NAME}
+
                         sleep 5
                         echo "🌐 Checking container status..."
                         docker ps | grep simple-demo || (echo "❌ Container failed to start!" && exit 1)
-                        echo "✅ Container started successfully!"
+                        echo "✅ Container is running successfully on port $PORT!"
+                        echo "🌍 Access your app at http://$(hostname -I | awk '{print $1}'):${PORT}"
                     '''
                 }
             }
@@ -88,15 +102,12 @@ pipeline {
     }
 
     post {
-        success {
-            echo '✅ Build and deployment successful!'
+        always {
+            echo "🧼 Cleaning up running containers..."
+            sh 'docker rm -f simple-demo || true'
         }
         failure {
-            echo '❌ Pipeline failed. Please check the logs.'
-        }
-        always {
-            echo '🧼 Cleaning up running containers...'
-            sh 'docker rm -f simple-demo || true'
+            echo "❌ Pipeline failed. Please check the logs."
         }
     }
 }
