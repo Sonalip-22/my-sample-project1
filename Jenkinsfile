@@ -72,10 +72,12 @@ pipeline {
                         # Remove old container if exists
                         docker rm -f simple-demo || true
 
-                        # Check if port 8080 is free
+                        # Kill any process using port 8080
                         if ss -tuln | grep -q ":8080 "; then
-                          echo "❌ Port 8080 is already in use. Cannot start container."
-                          exit 1
+                          echo "⚠️ Port 8080 is in use. Killing existing process..."
+                          PID=$(lsof -ti :8080)
+                          sudo kill -9 $PID
+                          echo "✅ Process on port 8080 killed."
                         fi
 
                         # Run container on port 8080
