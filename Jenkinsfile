@@ -67,34 +67,25 @@ pipeline {
                 script {
                     sh '''#!/bin/bash
                         set -e
-                        echo "🚀 Starting container deployment..."
+                        echo "🚀 Starting container deployment on port 8080..."
 
-                        # Clean up any old container
+                        # Remove old container if exists
                         docker rm -f simple-demo || true
 
-                        # Detect if port 8080 is busy
+                        # Check if port 8080 is free
                         if ss -tuln | grep -q ":8080 "; then
-                          echo "⚠️ Port 8080 is in use, searching for an available port..."
-                          for p in $(seq 8081 8100); do
-                            if ! ss -tuln | grep -q ":$p "; then
-                              PORT=$p
-                              echo "✅ Found free port: $PORT"
-                              break
-                            fi
-                          done
-                        else
-                          PORT=8080
+                          echo "❌ Port 8080 is already in use. Cannot start container."
+                          exit 1
                         fi
 
-                        # Run the container on the available port
-                        echo "🚢 Running container on port $PORT..."
-                        docker run -d -p ${PORT}:8080 --name simple-demo ${IMAGE_NAME}
+                        # Run container on port 8080
+                        docker run -d -p 8080:8080 --name simple-demo ${IMAGE_NAME}
 
                         sleep 5
                         echo "🌐 Checking container status..."
                         docker ps | grep simple-demo || (echo "❌ Container failed to start!" && exit 1)
-                        echo "✅ Container is running successfully on port $PORT!"
-                        echo "🌍 Access your app at http://$(hostname -I | awk '{print $1}'):${PORT}"
+                        echo "✅ Container is running successfully on port 8080!"
+                        echo "🌍 Access your app at http://$(hostname -I | awk '{print $1}'):8080"
                     '''
                 }
             }
